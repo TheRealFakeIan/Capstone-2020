@@ -238,11 +238,38 @@ def vis_draw_trajectory(scene_path):
             print("Dead end. Please turn around. ")
             
             
-def show_depth_array(scene_path):
+
+    
+    
+def vis_navigate(scene_path):
+
+    def obs_detect(depth_image, threshold = 500):
+        left_flag = 0
+        mid_flag = 0
+        right_flag = 0    
+        copy = depth_image.copy()
+        second_smallest = sorted(list(set(copy.flatten().tolist())))[2]
+        result = np.where(t_depth_image == second_smallest)
+        coord_list = list(zip(result[0],result[1]))
+        for row,col in coord_list:
+            if depth_image[row][col] < threshold:
+                if col < 640: 
+                    left_flag = 1
+                elif col < 1280: 
+                    mid_flag = 1
+                else:
+                    right_flag = 1
+        if left_flag:
+            print("obstacle detected on the left")
+        if right_flag:
+            print("obstacle detected on the right")
+        if mid_flag:
+            print("obstacle detected in the middle")
+        return [left_flag,mid_flag,right_flag]
     
     def get_corresponding_depth(image_name):
-        return image_name[:-5]+'3'+image_name[-4:] 
-        
+        return image_name[:-5]+'3'+'.png'
+    
     #set up scene specfic paths
     images_path = os.path.join(scene_path,'jpg_rgb')
     depth_path = os.path.join(scene_path,'high_res_depth')
@@ -261,13 +288,59 @@ def show_depth_array(scene_path):
 
     #set up for first image
     cur_image_name = image_names[0]
-    cur_depth_name = depth_names[0]
     next_image_name = ''
-    tminus1_color_image = None
+ 
+    
+    while True:
+        
+        cur_depth_name = get_corresponding_depth(cur_image_name)
+        #read images
+        t_depth_image = cv2.imread(os.path.join(depth_path,cur_depth_name), cv2.IMREAD_ANYDEPTH)
+        t_color_image = cv2.imread(os.path.join(images_path,cur_image_name))
+        
+        obs_detect(t_depth_image)
+        
+        cv2.namedWindow('bgr image', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('bgr image', 960, 540) #original image resolution is 1080x1920(h x w)
+        cv2.imshow('bgr image',t_color_image)
+        
+        #cv2.namedWindow('depth image', cv2.WINDOW_NORMAL)
+        #cv2.resizeWindow('depth image', 960, 540) #original image resolution is 1080x1920(h x w)
+        #cv2.imshow('depth image',t_depth_image)
 
-    #Read images 
-    t_color_image = cv2.imread(os.path.join(images_path,cur_image_name))
-    t_depth_image = cv2.imread(os.path.join(images_path,cur_image_name),cv2.IMREAD_ANYDEPTH)
-    print(t_color_image.shape)
-    print(t_depth_image.shape)
+        key = cv2.waitKey(-1)
+    
+        if key==119:
+            next_image_name = annotations[cur_image_name]['forward']
+        elif key==97:
+            next_image_name = annotations[cur_image_name]['rotate_ccw']
+        elif key==115:
+            next_image_name = annotations[cur_image_name]['backward']
+        elif key==100:
+            next_image_name = annotations[cur_image_name]['rotate_cw']
+        elif key==101:
+            next_image_name = annotations[cur_image_name]['left']
+        elif key==114:
+            next_image_name = annotations[cur_image_name]['right']
+        elif key==104:
+            next_image_name = cur_image_name
+            print("{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n".format(
+                  "Enter a character to move around the scene:",
+                  "'w' - forward", 
+                  "'a' - rotate counter clockwise", 
+                  "'s' - backward", 
+                  "'d' - rotate clockwise", 
+                  "'e' - left", 
+                  "'r' - right", 
+                  "'q' - quit", 
+                  "'h' - print this help menu"))
+        elif key==113:
+            cv2.destroyAllWindows
+            break
+        
+        if next_image_name != '':
+            cur_image_name = next_image_name
+            
+    
+    return
     
