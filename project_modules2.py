@@ -14,7 +14,7 @@ def get_colour_range(target_colour):
         
     #colour codes
     black  = (0,179,0,255,0,40)
-    white  = (0,179,0,64,192,255)
+    white  = (0,179,0,64,200,255)
     red1   = (0,8,64,255,64,255)
     red2   = (141,179,64,255,64,255) #includes pink
     orange = (9,20,64,255,64,255) #brown may overlap
@@ -72,7 +72,7 @@ def search_circle(img, target_colour):
 
     return found, img
 
-def search_polygon(img, target_shape, target_colour):
+def search_polygon(img, target_shape, target_colour, depth_path, cur_depth_name):
     
     found = False
     found_object = None
@@ -96,11 +96,13 @@ def search_polygon(img, target_shape, target_colour):
     for cnt in contours: 
         area = cv.contourArea(cnt) 
 
-        if area>30000:
+        if area>30000 and area<500000:
     
-            approx = cv.approxPolyDP(cnt, 0.02 * cv.arcLength(cnt, True), True) #dont change 0.05
-       
+            approx = cv.approxPolyDP(cnt, 0.05 * cv.arcLength(cnt, True), True) #dont change 0.05
+            approx = np.squeeze(approx)
+
             if target_shape == 'square' and len(approx) == 4:
+                
                 x,y,w,h = cv.boundingRect(approx)
                 aspectRatio = float(w/h)
                 if aspectRatio >= 0.95 and aspectRatio <= 1.05:
@@ -109,27 +111,35 @@ def search_polygon(img, target_shape, target_colour):
                         if area > biggest_cnt_area:
                             biggest_cnt_area = area
                             biggest_cnt = approx
+                            
                     
             elif target_shape == 'rectangle' and len(approx) == 4: 
                 x,y,w,h = cv.boundingRect(approx)
                 aspectRatio = float(w/h)
                 if aspectRatio <= 0.95 or aspectRatio >= 1.05:
-                    if cv.isContourConvex(approx):
-                        found = True
-                        if area > biggest_cnt_area:
-                            biggest_cnt_area = area
-                            biggest_cnt = approx
+                    if cv.isContourConvex(approx): 
                         
+                        if is_parallelogram(approx):
+                        
+                            #cy = y + h/2
+                            #if cy > 1080*0.1 and cy < 1080*0.9:
+                            
+                                   
+                            found = True
+                            if area > biggest_cnt_area:
+                                biggest_cnt_area = area
+                                biggest_cnt = approx
+                                                      
   
             elif target_shape == 'triangle' and len(approx) == 3:
                 found = True
                 if area > biggest_cnt_area:
                     biggest_cnt_area = area
                     biggest_cnt = approx
-                                    
+                                
     if found:
         img = cv.drawContours(img, [biggest_cnt], 0, (0, 0, 255), 5)
-        found_object = biggest_cnt[0]
+        found_object = np.squeeze(biggest_cnt)
         
     return found, img, mask, found_object
 
@@ -166,7 +176,7 @@ def get_area(mask, found_object, depth_path, cur_depth_name):
     return real_area
         
 def compare_area(cur_obj_area, prev_obj_area):
-    diff = abs(cur_obj_area - prev_obj_area)
+    diff = abs(cur_obj_area - prev_obj_area)/cur_obj_area
     if diff < 0.3*cur_obj_area:
         return True
     else:
@@ -261,5 +271,87 @@ def update_pos_img(cur_image_name, next_image_name, key, theta):
 
 
 
+def command_disp(key, annotations, images_path, cur_image_name, img):
+    if key==119:
+        next_image_name = annotations[cur_image_name]['forward']
+    elif key==97:
+        next_image_name = annotations[cur_image_name]['rotate_ccw']
+    elif key==115:
+        next_image_name = annotations[cur_image_name]['backward']
+    elif key==100:
+        next_image_name = annotations[cur_image_name]['rotate_cw']
+    elif key==101:
+        next_image_name = annotations[cur_image_name]['left']
+    elif key==114:
+        next_image_name = annotations[cur_image_name]['right']
+    elif key==113:
+        cv.destroyAllWindows
     
+    img = cv.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
+    cv.imshow('img', img)
+    key = cv.waitKey(50)
+    next_img = cv.imread(os.path.join(images_path, next_image_name))
+    return next_image_name, next_img
 
+
+def obs_detect(depth_image, threshold = 500):
+    flag = [0]*5 
+    left_flag = 0
+    mid_flag = 0
+    right_flag = 0
+    copy = depth_image.copy()
+    second_smallest = sorted(list(set(copy.flatten().tolist())))[2]
+    result = np.where(depth_image == second_smallest)
+    coord_list = list(zip(result[0],result[1]))
+    for row,col in coord_list:
+        if depth_image[row][col] < threshold:
+            if col > 1920*0.1 and col < 1920*0.2:
+                left_flag = 1
+            elif col >= 1920*0.4 and col <= 1920*0.6: 
+                mid_flag = 1
+            elif col > 1920*0.8 and col < 1920*0.9:
+                right_flag = 1
+            
+            '''if col < 1920*0.2:
+                flag[0] = 1
+            elif col >= 1920*0.2 and col < 0.3:
+                flag[1] = 1
+            elif col >= 1920*0.3 and col < 0.7:
+                flag[2] = 1
+            elif col >= 1920*0.7 and col < 0.8:
+                flag[3] = 1
+            elif col >= 1920*0.8:
+                flag[4] = 1'''
+            
+    '''if left_flag:
+        print("obstacle detected on the left")
+    if right_flag:
+        print("obstacle detected on the right")
+    if mid_flag:
+        print("obstacle detected in the middle")'''
+    return [left_flag,mid_flag,right_flag]
+    print (flag)
+   
+    #return flag
+
+    
+def is_parallelogram(approx):
+    x_coordinates = np.sort([point[0] for point in approx])
+    y_coordinates = np.sort([point[1] for point in approx])
+    p0 = approx[np.where(approx[:,0]==x_coordinates[0])[0][0]]
+    p1 = approx[np.where(approx[:,0]==x_coordinates[1])[0][0]]
+    p2 = approx[np.where(approx[:,0]==x_coordinates[2])[0][0]]
+    p3 = approx[np.where(approx[:,0]==x_coordinates[3])[0][0]]
+    
+    width1 = np.sqrt((p1[0] - p0[0])**2 + (p1[1] - p0[1])**2)
+    width2 = np.sqrt((p3[0] - p2[0])**2 + (p3[1] - p2[1])**2)
+    height1 = np.sqrt((p3[0] - p1[0])**2 + (p3[1] - p1[1])**2)
+    height2 = np.sqrt((p2[0] - p0[0])**2 + (p2[1] - p0[1])**2)
+    
+    width_diff = abs(width1 - width2)/width1
+    height_diff = abs(height1 - height2)/height1
+    
+    if width_diff < 0.3 and height_diff < 0.3:
+        return True
+    else:
+        return False
