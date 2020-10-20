@@ -159,9 +159,10 @@ while True:
             next_image_name, next_img, x_co, y_co, theta, fig = command_disp(119, annotations, images_path, cur_image_name, img, x_co, y_co, theta, fig, found) #forwards
             
             #reset rotation counter
-            if left_rotation !=0 or right_rotation != 0:
+            if left_rotation != 0 or right_rotation != 0:
                 left_rotation = 0
                 right_rotation = 0
+                
 
     #If there is an image available, continue navigating forward
     if next_image_name != '':

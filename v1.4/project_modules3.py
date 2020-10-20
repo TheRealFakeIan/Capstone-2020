@@ -9,8 +9,6 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 
 def get_colour_range(target_colour):
         
@@ -186,8 +184,8 @@ def command_disp(key, annotations, images_path, cur_image_name, img, x_co, y_co,
         dy = 0
     
     
-    plt.xlim(-20,20)
-    plt.ylim(-20,20) 
+    plt.xlim(-10,10)
+    plt.ylim(-10,10) 
     plt.arrow(x_co, y_co, dx, dy)
     if found:
         plt.plot(x_co+dx, y_co+dy, 'b+')   
