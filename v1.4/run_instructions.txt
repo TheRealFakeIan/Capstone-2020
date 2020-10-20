@@ -1,0 +1,2 @@
+Enter this in cmd:
+python tracking9.py Home_006_1 black rectangle
